@@ -6,8 +6,6 @@ import io
 import unittest
 from unittest.mock import patch
 
-from src import list_twice
-
 
 def _expected_output(values):
     """Build the expected printed lines for a run of inputs.
@@ -32,13 +30,25 @@ class TestListTwice(unittest.TestCase):
     `if __name__ == "__main__":`, since the grader needs to re-run the loop
     with different inputs), so each test re-executes the module with
     importlib.reload() while patching builtins.input.
+
+    Importing `src.list_twice` runs that loop for real the moment the
+    module is first loaded, so even the *first* import must happen with
+    input() already patched - otherwise it blocks on real stdin (or raises
+    EOFError if stdin is closed) before any test body runs. setUpClass
+    performs that first guarded import; every test then reloads the
+    already-imported module under its own patch.
     """
+
+    @classmethod
+    def setUpClass(cls):
+        with patch('builtins.input', side_effect=["0"]):
+            cls.list_twice = importlib.import_module('src.list_twice')
 
     def run_with_inputs(self, values):
         with patch('builtins.input', side_effect=list(values)):
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                importlib.reload(list_twice)
+                importlib.reload(self.list_twice)
             return buf.getvalue()
 
     def check_inputs(self, values):
